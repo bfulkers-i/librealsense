@@ -21,6 +21,8 @@
 #include "fw_central_app.h"
 #include "fw_central_bl.h"
 
+#include "message-print.h"
+
 #define CHUNK_SIZE 512
 #define BUFFER_SIZE 1024
 #define SYNC_TIME_FREQUENCY_NS 500000000 // in nano seconds, every 500 msec
@@ -1978,6 +1980,7 @@ namespace perc {
         }
 
         int actual;
+        std::cerr << "Send: " << message_name(msg->header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, buf.data(), (int)buf.size(), &actual, USB_TRANSFER_MEDIUM_TIMEOUT_MS);
         if (rc != 0 || actual == 0)
         {
@@ -2287,6 +2290,7 @@ namespace perc {
         req->metadata.flVz = frame.translationalVelocity.z;
 
         int actual;
+        std::cerr << "Send: " << message_name(req->rawStreamHeader.header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, (unsigned char*)req, (int)buf.size(), &actual, 100);
         if (rc != 0 || actual == 0)
         {
@@ -2320,6 +2324,7 @@ namespace perc {
         req->metadata.flGz = frame.angularVelocity.z;
 
         int actual;
+        std::cerr << "Send: " << message_name(req->rawStreamHeader.header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, (unsigned char*)req, (int)buf.size(), &actual, 100);
         if (rc != 0 || actual == 0)
         {
@@ -2352,6 +2357,7 @@ namespace perc {
         req->metadata.flAz = frame.acceleration.z;
 
         int actual;
+        std::cerr << "Send: " << message_name(req->rawStreamHeader.header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, (unsigned char*)req, (int)buf.size(), &actual, 100);
         if (rc != 0 || actual == 0)
         {
@@ -2385,6 +2391,7 @@ namespace perc {
         perc::copy(buf.data() + sizeof(bulk_message_video_stream), frame.data, frame.profile.stride*frame.profile.height);
 
         int actual;
+        std::cerr << "Send: " << message_name(msg->rawStreamHeader.header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, buf.data(), (int)buf.size(), &actual, 100);
         if (rc != 0 || actual == 0)
         {
@@ -2418,6 +2425,7 @@ namespace perc {
         perc::copy(msg->bMask, frame.data, frame.profile.stride*frame.profile.height);
 
         int actual;
+        std::cerr << "Send: " << message_name(msg->rawStreamHeader.header) << "\n";
         auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, buf.data(), (int)buf.size(), &actual, 100);
         if (rc != 0 || actual == 0)
         {
@@ -2832,6 +2840,7 @@ namespace perc {
             }
 
             bulk_message_raw_stream_header* header = (bulk_message_raw_stream_header*)mFramesBuffersLists.front().get();
+            std::cerr << "Receive: " << message_name(header->header) << "\n";
             switch (header->header.wMessageID)
             {
                 case DEV_SAMPLE:
@@ -3036,6 +3045,7 @@ namespace perc {
                 mDispatcher->postMessage(&mFsm, Message(ON_ERROR));
                 break;
             }
+            std::cerr << "Receive interrupt: " << message_name(*header) << "\n";
 
             switch (header->wMessageID)
             {
@@ -3477,6 +3487,7 @@ namespace perc {
 
         DEVICELOGD("Flushing Command EndPoint - Start");
 
+        std::cerr << "Send: " << message_name(request.header) << "\n";
         int rc = libusb_bulk_transfer(mDevice, mEndpointBulkMessages | TO_DEVICE, (uint8_t*)&request, BUFFER_SIZE, &actual, USB_TRANSFER_FAST_TIMEOUT_MS);
         if (rc != 0 || actual != BUFFER_SIZE) // lets assume no message will be more than 2Gb size
         {
@@ -3488,6 +3499,7 @@ namespace perc {
         {
             DEVICELOGD("Flushing Command EndPoint...");
             rc = libusb_bulk_transfer(mDevice, mEndpointBulkMessages | TO_HOST, (unsigned char*)response, BUFFER_SIZE, &actual, USB_TRANSFER_FAST_TIMEOUT_MS);
+            std::cerr << "Receive: " << message_name(response->header) << "\n";
 
             if (response->header.wStatus == toUnderlying(MESSAGE_STATUS::UNKNOWN_MESSAGE_ID))
             {
@@ -3518,6 +3530,7 @@ namespace perc {
         {
             DEVICELOGD("Flushing Stream EndPoint...");
             auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_HOST, (unsigned char *)response, BUFFER_SIZE, &actual, USB_TRANSFER_FAST_TIMEOUT_MS);
+            std::cerr << "Receive: " << message_name(response->header) << "\n";
             if (rc == LIBUSB_ERROR_TIMEOUT)
                 continue;
 
@@ -3555,6 +3568,7 @@ namespace perc {
                 break;
             }
 
+            std::cerr << "Receive interrupt: " << message_name(response->header) << "\n";
             if ((response->header.wMessageID == DEV_FLUSH) && (response->ddwToken == request.ddwToken))
             {
                 stopFlush = true;
@@ -4013,6 +4027,7 @@ namespace perc {
             WakeFW();
         }
 
+        std::cerr << "Send bulk: " << message_name(*header) << "\n";
         int rc = libusb_bulk_transfer(mDevice, usbMsg.mEndpointOut, buffer, BUFFER_SIZE, &actual, usbMsg.mTimeoutInMs);
 
         DEVICELOGV("Sent request - MessageID: 0x%X (%s), Len: %d, UsbLen: %d, Actual: %d, rc: %d (%s)", 
@@ -4028,6 +4043,7 @@ namespace perc {
         rc = libusb_bulk_transfer(mDevice, usbMsg.mEndpointIn, usbMsg.mDst, usbMsg.dstSize, &actual, usbMsg.mTimeoutInMs);
 
         bulk_message_response_header* res = (bulk_message_response_header*)usbMsg.mDst;
+        std::cerr << "Received bulk: " << message_name(*res) << "\n";
 
         DEVICELOGV("Got response - MessageID: 0x%X (%s), Len: %d, Status: 0x%X, UsbLen: %d, Actual: %d, rc: %d (%s)", 
             res->wMessageID, messageCodeToString(LIBUSB_TRANSFER_TYPE_BULK, res->wMessageID).c_str(), res->dwLength, res->wStatus, usbMsg.dstSize, actual, rc, libusb_error_name(rc));
@@ -4169,6 +4185,7 @@ namespace perc {
             perc::copy(&stream->bPayload, buffer + (length - leftLength), chunkLength);
 
             actual = 0;
+            std::cerr << "Send: " << message_name(stream->header) << "\n";
             auto rc = libusb_bulk_transfer(mDevice, mStreamEndpoint | TO_DEVICE, (unsigned char*)stream, stream->header.dwLength, &actual, 5000);
             if (rc != 0 || actual == 0)
             {
