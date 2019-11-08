@@ -130,23 +130,6 @@ void rs2_loopback_disable(const rs2_device* device, rs2_error** error);
 */
 int rs2_loopback_is_enabled(const rs2_device* device, rs2_error** error);
 
-/**
-* Connects to a given tm2 controller
-* \param[in]  device     Device to connect to the controller
-* \param[in]  mac_addr   The MAC address of the desired controller
-* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
-*/
-void rs2_connect_tm2_controller(const rs2_device* device, const unsigned char* mac_addr, rs2_error** error);
-
-/**
-* Disconnects a given tm2 controller
-* \param[in]  device     Device to disconnect the controller from
-* \param[in]  id         The ID of the desired controller
-* \param[out] error      If non-null, receives any error that occurs during this call, otherwise, errors are ignored
-*/
-void rs2_disconnect_tm2_controller(const rs2_device* device, int id, rs2_error** error);
-
-
 /** 
 * Reset device to factory calibration
 * \param[in] device       The RealSense device
