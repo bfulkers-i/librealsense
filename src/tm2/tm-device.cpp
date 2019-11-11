@@ -1629,7 +1629,7 @@ namespace librealsense
                     left_length -= chunk_size;
 
                     //LOG_DEBUG("Sending chunk length " << chunk_size << " of map size " << map_size);
-                    device->stream_write(message);
+                    device->stream_write((t265::bulk_message_request_header *)message);
                 }
                 return true;
             },
@@ -1700,7 +1700,7 @@ namespace librealsense
 
         //TODO: There is no way on the firmware to know if this succeeds.
 
-        device->stream_write(&request);
+        device->stream_write((t265::bulk_message_request_header *)&request);
 
         return true;
     }
@@ -1721,7 +1721,7 @@ namespace librealsense
         request.metadata.flVy = translational_velocity.y;
         request.metadata.flVz = translational_velocity.z;
 
-        device->stream_write(&request);
+        device->stream_write((t265::bulk_message_request_header *)&request);
 
         return true;
     }
@@ -1961,15 +1961,14 @@ namespace librealsense
         return e;
     }
 
-    template<typename Request> int tm2_device::stream_write(const Request * request)
+    // all messages must have dwLength and wMessageID as first two members
+    int tm2_device::stream_write(const t265::bulk_message_request_header * request)
     {
         std::lock_guard<std::mutex> lock(stream_mutex);
 
-        auto header = (bulk_message_request_header *)request; // all messages must have dwLength and wMessageID as first two members
-
-        uint32_t length = header->dwLength;
-        uint16_t message_id = header->wMessageID;
-        LOG_DEBUG("Sending stream message " << message_name(*header) << " length " << length);
+        uint32_t length = request->dwLength;
+        uint16_t message_id = request->wMessageID;
+        LOG_DEBUG("Sending stream message " << message_name(*request) << " length " << length);
         int transferred = 0;
         int e = 0;
         e = libusb_bulk_transfer(handle, ENDPOINT_HOST_OUT, (uint8_t *)request, length, &transferred, USB_TIMEOUT);

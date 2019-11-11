@@ -58,7 +58,7 @@ namespace librealsense
 
         std::mutex stream_mutex;
         int stream_read(uint8_t * buffer, size_t max_read, int & received);
-        template<typename Request> int stream_write(const Request * request);
+        int stream_write(const t265::bulk_message_request_header * request);
 
 
         friend class tm2_sensor;
