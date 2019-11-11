@@ -356,7 +356,7 @@ namespace librealsense
     };
 
     tm2_sensor::tm2_sensor(tm2_device* owner)
-        : sensor_base("Tracking Module", owner, this), device(owner)
+        : sensor_base("Tracking Module", owner, this), _device(owner)
     {
         LOG_DEBUG("Making a sensor " << this);
         _source.set_max_publish_list_size(64); //increase frame source queue size for TM2
@@ -431,7 +431,7 @@ namespace librealsense
         bulk_message_request_get_supported_raw_streams request = {{ sizeof(request), DEV_GET_SUPPORTED_RAW_STREAMS }};
         char buffer[BUFFER_SIZE];
         auto response = (bulk_message_response_get_supported_raw_streams *)buffer;
-        device->bulk_request_response(request, *response, BUFFER_SIZE);
+        _device->bulk_request_response(request, *response, BUFFER_SIZE);
 
         // Note the pose stream is special. We need to create one for
         // librealsense below, but it is not a raw_stream as defined
@@ -645,7 +645,7 @@ namespace librealsense
         memcpy(request->stream, _active_raw_streams.data(), request->wNumEnabledStreams*sizeof(supported_raw_stream_libtm_message));
         request->header.dwLength = request->wNumEnabledStreams * sizeof(supported_raw_stream_libtm_message) + sizeof(request->header) + sizeof(request->wNumEnabledStreams);
         bulk_message_response_raw_streams_control response;
-        device->bulk_request_response(*request, response, sizeof(response), false);
+        _device->bulk_request_response(*request, response, sizeof(response), false);
         if(response.header.wStatus == DEVICE_BUSY)
             throw wrong_api_call_sequence_exception("open(...) failed to configure streams. T265 is running!");
         else if(response.header.wStatus == INVALID_REQUEST_LEN)
@@ -660,13 +660,13 @@ namespace librealsense
         log_request.bVerbosity = log_level::LOG_ERR;
         log_request.bLogMode = 0x1; // rollover mode
         bulk_message_response_log_control log_response = {};
-        device->bulk_request_response(log_request, log_response);
+        _device->bulk_request_response(log_request, log_response);
 
         bulk_message_request_6dof_control control_request = {{ sizeof(control_request), SLAM_6DOF_CONTROL }};
         control_request.bEnable = _pose_output_enabled;
         control_request.bMode = _tm_mode;
         bulk_message_response_6dof_control control_response = {};
-        device->bulk_request_response(control_request, control_response, sizeof(control_response), false);
+        _device->bulk_request_response(control_request, control_response, sizeof(control_response), false);
         if(control_response.header.wStatus == DEVICE_BUSY)
             throw wrong_api_call_sequence_exception("open(...) failed. T265 is running!");
         else if(control_response.header.wStatus != SUCCESS)
@@ -808,7 +808,7 @@ namespace librealsense
 
         bulk_message_request_start request = {{ sizeof(request), DEV_START }};
         bulk_message_response_start response = {};
-        device->bulk_request_response(request, response, sizeof(response), false);
+        _device->bulk_request_response(request, response, sizeof(response), false);
         if(response.header.wStatus == DEVICE_BUSY)
             throw wrong_api_call_sequence_exception("open(...) failed. T265 is already started!");
         else if(response.header.wStatus != SUCCESS)
@@ -845,7 +845,7 @@ namespace librealsense
         // Send the stop message
         bulk_message_request_stop request = {{ sizeof(request), DEV_STOP }};
         bulk_message_response_stop response = {};
-        device->bulk_request_response(request, response, sizeof(response), false);
+        _device->bulk_request_response(request, response, sizeof(response), false);
         if(response.header.wStatus == TIMEOUT)
             LOG_WARNING("Got a timeout while trying to stop");
         else if(response.header.wStatus != SUCCESS)
@@ -867,7 +867,7 @@ namespace librealsense
         bulk_message_request_get_camera_intrinsics request = {{ sizeof(request), DEV_GET_CAMERA_INTRINSICS }};
         request.bCameraID = SET_SENSOR_ID(sensor_type, sensor_id);
         bulk_message_response_get_camera_intrinsics response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
 
         rs2_intrinsics result;
         result.width = response.intrinsics.dwWidth;
@@ -896,7 +896,7 @@ namespace librealsense
         bulk_message_request_get_motion_intrinsics request = {{ sizeof(request), DEV_GET_MOTION_INTRINSICS }};
         request.bMotionID = SET_SENSOR_ID(sensor_type, sensor_id);
         bulk_message_response_get_motion_intrinsics response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
 
         rs2_motion_device_intrinsic result{};
         librealsense::copy_2darray<true>(result.data, response.intrinsics.flData);
@@ -915,7 +915,7 @@ namespace librealsense
         bulk_message_request_get_extrinsics request = {{ sizeof(request), DEV_GET_EXTRINSICS }};
         request.bSensorID = SET_SENSOR_ID(sensor_type, sensor_id);
         bulk_message_response_get_extrinsics response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
 
         if(response.extrinsics.bReferenceSensorID != SET_SENSOR_ID(SensorType::Pose, 0)) {
             LOG_ERROR("Unexpected reference sensor id " << response.extrinsics.bReferenceSensorID);
@@ -951,7 +951,7 @@ namespace librealsense
         librealsense::copy_array(request.intrinsics.flCoeffs, intr.coeffs);
 
         bulk_message_response_set_camera_intrinsics response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::set_extrinsics(const stream_profile_interface& from_profile, const stream_profile_interface& to_profile, const rs2_extrinsics& extr)
@@ -1012,7 +1012,7 @@ namespace librealsense
         librealsense::copy_array<true>(request.extrinsics.flTranslation, extr.translation);
         bulk_message_response_set_extrinsics response = {};
 
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::set_motion_device_intrinsics(const stream_profile_interface& stream_profile, const rs2_motion_device_intrinsic& intr)
@@ -1033,7 +1033,7 @@ namespace librealsense
         librealsense::copy_array<true>(request.intrinsics.flBiasVariances, intr.bias_variances);
 
         bulk_message_response_set_motion_intrinsics response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::write_calibration()
@@ -1044,7 +1044,7 @@ namespace librealsense
         // id to tell us to write the calibration
         request.header.dwLength = offsetof(bulk_message_request_write_configuration, bTable);
         bulk_message_response_write_configuration response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::reset_to_factory_calibration()
@@ -1052,7 +1052,7 @@ namespace librealsense
         bulk_message_request_reset_configuration request = {{ sizeof(request), DEV_RESET_CONFIGURATION }};
         request.wTableId = ID_OEM_CAL;
         bulk_message_response_reset_configuration response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::receive_pose_message(const interrupt_message_get_pose & pose_message)
@@ -1223,7 +1223,7 @@ namespace librealsense
         while(!_interrupt_endpoint_thread_stop) {
             int received = 0;
             {
-                int result = device->interrupt_read(buffer, BUFFER_SIZE, received);
+                int result = _device->interrupt_read(buffer, BUFFER_SIZE, received);
                 if (result == LIBUSB_ERROR_TIMEOUT) {
                     //fprintf(stderr, ".");
                     continue;
@@ -1299,7 +1299,7 @@ namespace librealsense
         auto response = (bulk_message_raw_stream_header *)buffer.get();
         while(!_stream_endpoint_thread_stop) {
             int transferred = 0;
-            int e = device->stream_read(buffer.get(), MAX_TRANSFER_SIZE, transferred);
+            int e = _device->stream_read(buffer.get(), MAX_TRANSFER_SIZE, transferred);
             if (e == LIBUSB_ERROR_TIMEOUT) {
                 //fprintf(stderr, "+");
                 continue;
@@ -1362,7 +1362,7 @@ namespace librealsense
     {
         bulk_message_request_get_and_clear_event_log log_request = {{ sizeof(log_request), DEV_GET_AND_CLEAR_EVENT_LOG }};
         bulk_message_response_get_and_clear_event_log *log_response = log_buffer.get();
-        device->bulk_request_response(log_request, *log_response, sizeof(bulk_message_response_get_and_clear_event_log), false);
+        _device->bulk_request_response(log_request, *log_response, sizeof(bulk_message_response_get_and_clear_event_log), false);
         if(log_response->header.wStatus == INVALID_REQUEST_LEN || log_response->header.wStatus == INTERNAL_ERROR)
             LOG_ERROR("T265 log size mismatch " << status_name(log_response->header));
         else if(log_response->header.wStatus != SUCCESS)
@@ -1386,7 +1386,7 @@ namespace librealsense
             bulk_message_response_get_time response = {};
 
             auto start = duration<double, std::milli>(environment::get_instance().get_time_service()->get_time());
-            device->bulk_request_response(request, response);
+            _device->bulk_request_response(request, response);
             auto finish = duration<double, std::milli>(environment::get_instance().get_time_service()->get_time());
 
             double device_ms = (double)response.llNanoseconds*1e-6;
@@ -1581,7 +1581,7 @@ namespace librealsense
                 _async_op_res_buffer.clear();
                 bulk_message_request_get_localization_data request = {{ sizeof(request), SLAM_GET_LOCALIZATION_DATA }};
                 bulk_message_response_get_localization_data response = {};
-                int error = device->bulk_request_response(request, response);
+                int error = _device->bulk_request_response(request, response);
                 return !error;
             },
             [&](){
@@ -1629,7 +1629,7 @@ namespace librealsense
                     left_length -= chunk_size;
 
                     //LOG_DEBUG("Sending chunk length " << chunk_size << " of map size " << map_size);
-                    device->stream_write((t265::bulk_message_request_header *)message);
+                    _device->stream_write((t265::bulk_message_request_header *)message);
                 }
                 return true;
             },
@@ -1654,7 +1654,7 @@ namespace librealsense
         request.data.flQk = orient_quat.z;
         request.data.flQr = orient_quat.w;
         bulk_message_response_set_static_node response = {};
-        device->bulk_request_response(request, response, sizeof(response), false);
+        _device->bulk_request_response(request, response, sizeof(response), false);
         if(response.header.wStatus == INTERNAL_ERROR)
             return false; // Failed to set static node
         else if(response.header.wStatus != SUCCESS) {
@@ -1671,7 +1671,7 @@ namespace librealsense
         strncpy((char *)&request.bGuid[0], guid.c_str(), MAX_GUID_LENGTH-1);
         bulk_message_response_get_static_node response = {};
 
-        device->bulk_request_response(request, response, sizeof(response), false);
+        _device->bulk_request_response(request, response, sizeof(response), false);
         if(response.header.wStatus == INTERNAL_ERROR)
             return false; // Failed to get static node
         else if(response.header.wStatus != SUCCESS) {
@@ -1700,7 +1700,7 @@ namespace librealsense
 
         //TODO: There is no way on the firmware to know if this succeeds.
 
-        device->stream_write((t265::bulk_message_request_header *)&request);
+        _device->stream_write((t265::bulk_message_request_header *)&request);
 
         return true;
     }
@@ -1721,7 +1721,7 @@ namespace librealsense
         request.metadata.flVy = translational_velocity.y;
         request.metadata.flVz = translational_velocity.z;
 
-        device->stream_write((t265::bulk_message_request_header *)&request);
+        _device->stream_write((t265::bulk_message_request_header *)&request);
 
         return true;
     }
@@ -1731,7 +1731,7 @@ namespace librealsense
         uint8_t buffer[BUFFER_SIZE];
         bulk_message_request_get_temperature request = {{ sizeof(request), DEV_GET_TEMPERATURE }};
         bulk_message_response_get_temperature* response = (bulk_message_response_get_temperature*)buffer;
-        device->bulk_request_response(request, *response, BUFFER_SIZE);
+        _device->bulk_request_response(request, *response, BUFFER_SIZE);
 
         if(uint32_t(sensor_id) > response->dwCount)
             throw wrong_api_call_sequence_exception("Requested temperature for an unknown sensor id");
@@ -1751,7 +1751,7 @@ namespace librealsense
         }
         bulk_message_response_set_exposure response = {};
 
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
     }
 
     void tm2_sensor::set_exposure(float value)
@@ -1795,7 +1795,7 @@ namespace librealsense
         }
 
         bulk_message_response_set_exposure_mode_control response = {};
-        device->bulk_request_response(request, response);
+        _device->bulk_request_response(request, response);
 
         manual_exposure = manual;
     }

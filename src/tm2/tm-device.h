@@ -148,7 +148,7 @@ namespace librealsense
         std::vector<t265::supported_raw_stream_libtm_message> _supported_raw_streams;
         std::vector<t265::supported_raw_stream_libtm_message> _active_raw_streams;
         bool _pose_output_enabled{false};
-        tm2_device * device;
+        tm2_device * _device;
 
         void print_logs(const std::unique_ptr<t265::bulk_message_response_get_and_clear_event_log> & log);
 
