@@ -2220,6 +2220,25 @@ int rs2_loopback_is_enabled(const rs2_device* device, rs2_error** error) BEGIN_A
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0, device)
 
+void rs2_connect_tm2_controller(const rs2_device* device, const unsigned char* mac, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+    VALIDATE_NOT_NULL(mac);
+
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    tm2->connect_controller({ mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] });
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device)
+
+void rs2_disconnect_tm2_controller(const rs2_device* device, int id, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(device);
+
+    auto tm2 = VALIDATE_INTERFACE(device->device, librealsense::tm2_extensions);
+    tm2->disconnect_controller(id);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(, device)
+
 void rs2_set_intrinsics(const rs2_sensor* sensor, const rs2_stream_profile* profile, const rs2_intrinsics* intrinsics, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);

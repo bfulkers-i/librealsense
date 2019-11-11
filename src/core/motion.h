@@ -49,6 +49,8 @@ namespace librealsense
         virtual void enable_loopback(const std::string& input) = 0;
         virtual void disable_loopback() = 0;
         virtual bool is_enabled() const = 0;
+        virtual void connect_controller(const std::array<uint8_t, 6>& mac_address) = 0;
+        virtual void disconnect_controller(int id) = 0;
         virtual ~tm2_extensions() = default;
     };
     MAP_EXTENSION(RS2_EXTENSION_TM2, librealsense::tm2_extensions);

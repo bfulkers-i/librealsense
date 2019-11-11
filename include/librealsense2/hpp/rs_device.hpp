@@ -482,6 +482,28 @@ namespace rs2
         }
 
         /**
+        * Connects to a given tm2 controller
+        * \param[in]  mac_addr   The MAC address of the desired controller
+        */
+        void connect_controller(const std::array<uint8_t, 6>& mac_addr)
+        {
+            rs2_error* e = nullptr;
+            rs2_connect_tm2_controller(_dev.get(), mac_addr.data(), &e);
+            error::handle(e);
+        }
+
+        /**
+        * Disconnects a given tm2 controller
+        * \param[in]  id         The ID of the desired controller
+        */
+        void disconnect_controller(int id)
+        {
+            rs2_error* e = nullptr;
+            rs2_disconnect_tm2_controller(_dev.get(), id, &e);
+            error::handle(e);
+        }
+
+        /**
         * Set tm2 camera intrinsics
         * \param[in] fisheye_senor_id The ID of the fisheye sensor
         * \param[in] intrinsics       value to be written to the device
