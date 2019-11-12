@@ -1246,6 +1246,7 @@ namespace librealsense
             if(header->wMessageID == DEV_GET_POSE)
                 receive_pose_message(*((interrupt_message_get_pose*)header));
             else if(header->wMessageID == DEV_SAMPLE) {
+                if(!_is_streaming) continue;
                 int sensor_type = GET_SENSOR_TYPE(((interrupt_message_raw_stream_header*)header)->bSensorID);
                 if(sensor_type == SensorType::Accelerometer)
                     receive_accel_message(*((interrupt_message_accelerometer_stream*)header));
@@ -1331,8 +1332,10 @@ namespace librealsense
                 receive_localization_data_chunk((interrupt_message_get_localization_data_stream *)header);
             }
             else if(header->header.wMessageID == DEV_SAMPLE) {
-                if(GET_SENSOR_TYPE(header->bSensorID) == SensorType::Fisheye)
-                    receive_video_message((bulk_message_video_stream *)header);
+                if(GET_SENSOR_TYPE(header->bSensorID) == SensorType::Fisheye) {
+                    if(_is_streaming)
+                        receive_video_message((bulk_message_video_stream *)header);
+                }
                 else
                     LOG_ERROR("Unexpected DEV_SAMPLE with " << GET_SENSOR_TYPE(header->bSensorID) << " " << GET_SENSOR_INDEX(header->bSensorID));
             }
