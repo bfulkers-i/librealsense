@@ -13,6 +13,12 @@
 #include "libusb.h"
 #include "common/fw/target.h"
 
+#ifdef WIN32
+static const bool use_hotplug = false;
+#else
+static const bool use_hotplug = true;
+#endif
+
 namespace librealsense
 {
     tm2_info::tm2_info(std::shared_ptr<context> ctx, void * _device_ptr)
@@ -81,47 +87,59 @@ namespace librealsense
                     { 0x8087, 0x0AF3 }, // T260
                     { 0x8087, 0x0B37 }, // T261/T265
                 };
-                for (auto &d : known)
-                    libusb_hotplug_register_callback(tm2_context::get(),
-                                                     LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
-                                                     LIBUSB_HOTPLUG_NO_FLAGS/* LIBUSB_HOTPLUG_ENUMERATE*/,
-                                                     d.vendor_id, d.product_id,
-                                                     LIBUSB_HOTPLUG_MATCH_ANY,
-                                                     [](libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *completed_) -> int {
-                                                         *(int*)completed_ = true;
-                                                         return 0;
-                                                     },
-                                                     &completed,
-                                                     &d.handle);
+                if (use_hotplug) {
+                    for (auto &d : known)
+                        libusb_hotplug_register_callback(tm2_context::get(),
+                                                         LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+                                                         LIBUSB_HOTPLUG_NO_FLAGS/* LIBUSB_HOTPLUG_ENUMERATE*/,
+                                                         d.vendor_id, d.product_id,
+                                                         LIBUSB_HOTPLUG_MATCH_ANY,
+                                                         [](libusb_context *ctx, libusb_device *device, libusb_hotplug_event event, void *completed_) -> int {
+                                                             *(int*)completed_ = true;
+                                                             return 0;
+                                                         },
+                                                         &completed,
+                                                         &d.handle);
+                }
 
                 // transfer the firmware data
                 int size;
                 auto target_hex = fw_get_target(size);
 
+                if(!target_hex)
+                    LOG_ERROR("librealsense failed to get T265 FW resource");
+
                 int bytes_written;
-                if (libusb_bulk_transfer(handle, 0x1, const_cast<unsigned char*>(target_hex), size, &bytes_written, 10000) != 0 || bytes_written != size) {
+                if (!target_hex || libusb_bulk_transfer(handle, 0x1, const_cast<unsigned char*>(target_hex), size, &bytes_written, 10000) != 0 || bytes_written != size) {
                     libusb_release_interface(handle, 0);
                     libusb_close(handle);
-                    for (auto &d : known)
-                        libusb_hotplug_deregister_callback(tm2_context::get(), d.handle);
+                    if (use_hotplug) {
+                        for (auto &d : known)
+                            libusb_hotplug_deregister_callback(tm2_context::get(), d.handle);
+                    }
                     LOG_ERROR("T265 boot: transfer failed");
+                    continue;
                 }
+                LOG_INFO("Wrote " << bytes_written << "/" << size << " firmware bytes");
 
                 libusb_release_interface(handle, 0);
                 libusb_close(handle);
 
-                // wait for the firmware to show up
-                auto boot_delay = std::chrono::seconds(2);
-                auto secs = std::chrono::duration_cast<std::chrono::seconds>(boot_delay);
-                struct timeval boot_tv;
-                boot_tv.tv_sec = secs.count();
-                boot_tv.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(boot_delay - secs).count();
-                while (!completed)
-                    libusb_handle_events_timeout_completed(tm2_context::get(), &boot_tv, &completed);
+                if (use_hotplug) {
+                    LOG_INFO("Waiting for firmware to show up");
+                    // wait for the firmware to show up
+                    auto boot_delay = std::chrono::seconds(2);
+                    auto secs = std::chrono::duration_cast<std::chrono::seconds>(boot_delay);
+                    struct timeval boot_tv;
+                    boot_tv.tv_sec = secs.count();
+                    boot_tv.tv_usec = std::chrono::duration_cast<std::chrono::microseconds>(boot_delay - secs).count();
+                    while (!completed)
+                        libusb_handle_events_timeout_completed(tm2_context::get(), &boot_tv, &completed);
 
-                // after either a timeout or success return
-                for (auto &d : known)
-                    libusb_hotplug_deregister_callback(tm2_context::get(), d.handle);
+                    // after either a timeout or success return
+                    for (auto &d : known)
+                        libusb_hotplug_deregister_callback(tm2_context::get(), d.handle);
+                }
 
                 if (completed)
                     LOG_INFO("T265 booted");
@@ -162,7 +180,14 @@ namespace librealsense
 
                 bool good = false;
                 libusb_device_handle * handle;
-                int e = libusb_open(dev_list[i], &handle);
+                int e = 1;
+                int inc;
+                for(inc = 0; inc < 20; inc++) {
+                    e = libusb_open(dev_list[i], &handle);
+                    if(!e) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+                LOG_INFO("Waited " << inc * 100 << " milliseconds to obtain device");
                 if(!e) {
                     if (libusb_claim_interface(handle, 0) == LIBUSB_SUCCESS) {
                         libusb_release_interface(handle, 0);
