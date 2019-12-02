@@ -10,6 +10,9 @@
 #include "../core/motion.h"
 #include "../media/playback/playback_device.h"
 
+#include "../usb/usb-device.h"
+#include "../usb/usb-messenger.h"
+
 #include "libusb.h"
 
 #include "t265-messages.h"
@@ -50,18 +53,26 @@ namespace librealsense
         }
         std::shared_ptr<tm2_sensor> _sensor;
 
+        platform::usb_device_info usb_info;
+        platform::rs_usb_device usb_device;
+        platform::rs_usb_messenger usb_messenger;
+
+        platform::rs_usb_endpoint endpoint_msg_out, endpoint_msg_in;
+        platform::rs_usb_endpoint endpoint_bulk_out, endpoint_bulk_in;
+        platform::rs_usb_endpoint endpoint_int_out, endpoint_int_in;
+
         libusb_device * device_ptr{nullptr};
         libusb_device_handle * handle{nullptr};
 
         std::mutex bulk_mutex;
-        template<typename Request, typename Response> int bulk_request_response(const Request &request, Response &response, size_t max_response_size = 0, bool assert_success = true);
+        template<typename Request, typename Response> platform::usb_status bulk_request_response(const Request &request, Response &response, size_t max_response_size = 0, bool assert_success = true);
 
         std::mutex interrupt_mutex;
-        int interrupt_read(uint8_t * buffer, size_t max_read, int & received);
+        platform::usb_status interrupt_read(uint8_t * buffer, size_t max_read, uint32_t & received);
 
         std::mutex stream_mutex;
-        int stream_read(uint8_t * buffer, size_t max_read, int & received);
-        int stream_write(const t265::bulk_message_request_header * request);
+        platform::usb_status stream_read(uint8_t * buffer, size_t max_read, uint32_t & received);
+        platform::usb_status stream_write(const t265::bulk_message_request_header * request);
 
 
         friend class tm2_sensor;
