@@ -75,7 +75,13 @@ namespace librealsense
             if (!WinUsb_ResetPipe(h, endpoint->get_address()))
             {
                 auto lastResult = GetLastError();
-                LOG_ERROR("control_transfer failed, error: " << lastResult);
+                LOG_ERROR("Reset endpoint failed, error: " << lastResult);
+                return winusb_status_to_rs(lastResult);
+            }
+            if (!WinUsb_AbortPipe(h, endpoint->get_address()))
+            {
+                auto lastResult = GetLastError();
+                LOG_ERROR("Abort endpoint failed, error: " << lastResult);
                 return winusb_status_to_rs(lastResult);
             }
             return RS2_USB_STATUS_SUCCESS;

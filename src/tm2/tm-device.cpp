@@ -375,9 +375,6 @@ namespace librealsense
         // start time sync thread
         _time_sync_thread_stop = false;
         _time_sync_thread = std::thread(&tm2_sensor::time_sync, this);
-
-        start_interrupt();
-        start_stream();
     }
 
     tm2_sensor::~tm2_sensor()
@@ -415,13 +412,13 @@ namespace librealsense
 
             if(_stream_request) {
                 _stream_callback->cancel();
-                _device->cancel_request(_stream_request);
+                //_device->cancel_request(_stream_request);
             }
             _stream_request.reset();
 
             if(_interrupt_request) {
                 _interrupt_callback->cancel();
-                _device->cancel_request(_interrupt_request);
+                //_device->cancel_request(_interrupt_request);
             }
             _interrupt_request.reset();
         }
@@ -813,6 +810,9 @@ namespace librealsense
         else if (!_is_opened)
             throw wrong_api_call_sequence_exception("start_streaming(...) failed. T265 device was not opened!");
 
+        start_interrupt();
+        start_stream();
+
         _source.set_callback(callback);
         raise_on_before_streaming_changes(true);
 
@@ -862,6 +862,17 @@ namespace librealsense
             throw io_exception(to_string() << "Unknown error stopping " << status_name(response.header));
 
         LOG_DEBUG("T265 stopped");
+            if(_stream_request) {
+                _stream_callback->cancel();
+                //_device->cancel_request(_stream_request);
+            }
+            _stream_request.reset();
+
+            if(_interrupt_request) {
+                _interrupt_callback->cancel();
+                //_device->cancel_request(_interrupt_request);
+            }
+            _interrupt_request.reset();
 
         raise_on_before_streaming_changes(false);
         _is_streaming = false;
@@ -1906,6 +1917,12 @@ namespace librealsense
         LOG_DEBUG("Stopping sensor");
         // Note this is the last chance the tm2_sensor gets to use USB
         _sensor->dispose();
+        usb_messenger->reset_endpoint(endpoint_msg_in,0);
+        usb_messenger->reset_endpoint(endpoint_msg_out,0);
+        usb_messenger->reset_endpoint(endpoint_bulk_in,0);
+        usb_messenger->reset_endpoint(endpoint_bulk_out,0);
+        usb_messenger->reset_endpoint(endpoint_int_in,0);
+        usb_messenger->reset_endpoint(endpoint_int_out,0);
         LOG_DEBUG("Destroying T265 device");
     }
 
